@@ -1,8 +1,6 @@
-long_name = 55
+"""A discord bot that fixes Twitter video embeds"""
 
-def foo(bar, baz):
-    bar += 1
+from bot import TwitterVideoBot
 
-    baz /= 77 + bar
-
-    qux = 'aaa'
+if __name__ == "__main__":
+    TwitterVideoBot().run()
