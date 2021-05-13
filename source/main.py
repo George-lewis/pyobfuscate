@@ -131,7 +131,7 @@ def next_name(names: List[str]) -> str:
 
 PYDOC_PATTERN_SEMICOL = re.compile(r'(?<=:)(\s+)""".+"""')
 PYDOC_PATTERN_MODULE = re.compile(r'^""".+"""')
-COMMENT_PATTERN = re.compile(r'#[ \w]*')
+COMMENT_PATTERN = re.compile(r'#[^\n]*')
 
 def remove_pydoc(path_):
     """Let's be honest, nobody reads it anyway!"""
