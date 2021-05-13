@@ -1,6 +1,6 @@
 from typing import List
 
-from ast import parse, Name, Assign, Module, FunctionDef, arguments, arg, ClassDef, Expr, For, Try
+from ast import parse, Name, Assign, Module, FunctionDef, arguments, arg, ClassDef, Expr, For, Try, ExceptHandler
 
 from dataclasses import dataclass
 
@@ -39,8 +39,10 @@ def _names(ast) -> List[Ident]:
         return flatten([_names(x) for x in ast.body]) + _names(ast.args) + [Ident(ast.name, ast.lineno, ast.col_offset + 4)]
     if isinstance(ast, ClassDef):
         return flatten([_names(x) for x in ast.body]) + [Ident(ast.name, ast.lineno, ast.col_offset + 6)]
-    if isinstance(ast, (For, Try, Module)):
+    if isinstance(ast, (For, Module, ExceptHandler)):
         return flatten([_names(x) for x in ast.body])
+    if isinstance(ast, Try):
+        return flatten([_names(x) for x in ast.body]) + flatten([_names(x) for x in ast.handlers])
     print("skip: ", ast)
     return []
 
