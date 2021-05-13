@@ -26,29 +26,31 @@ class Span:
 
 flatten = lambda L: sum(L, [])
 
-def _names(ast) -> List[Ident]:
+def _names(ast, prefix: str = '') -> List[Ident]:
     if isinstance(ast, arguments):
-        return flatten([_names(arg) for arg in ast.args])
+        return flatten([_names(arg, prefix) for arg in ast.args])
     if isinstance(ast, arg):
-        return [Ident(ast.arg, ast.lineno, ast.col_offset)]
+        return [Ident(prefix + ast.arg, ast.lineno, ast.col_offset)]
     if isinstance(ast, Name):
-        return [Ident(ast.id, ast.lineno, ast.col_offset)]
+        return [Ident(prefix + ast.id, ast.lineno, ast.col_offset)]
     if isinstance(ast, Assign):
-        return flatten([_names(x) for x in ast.targets])
+        return flatten([_names(x, prefix) for x in ast.targets])
     if isinstance(ast, FunctionDef):
-        return flatten([_names(x) for x in ast.body]) + _names(ast.args) + [Ident(ast.name, ast.lineno, ast.col_offset + 4)]
+        prefix = prefix + ast.name
+        return flatten([_names(x, prefix) for x in ast.body]) + _names(ast.args, prefix) + [Ident(prefix + ast.name, ast.lineno, ast.col_offset + 4)]
     if isinstance(ast, AsyncFunctionDef):
-        return flatten([_names(x) for x in ast.body]) + _names(ast.args) + [Ident(ast.name, ast.lineno, ast.col_offset + 10)]
+        prefix = prefix + ast.name
+        return flatten([_names(x, prefix) for x in ast.body]) + _names(ast.args, prefix) + [Ident(prefix + ast.name, ast.lineno, ast.col_offset + 10)]
     if isinstance(ast, ClassDef):
-        return flatten([_names(x) for x in ast.body]) + [Ident(ast.name, ast.lineno, ast.col_offset + 6)]
+        return flatten([_names(x, prefix) for x in ast.body]) + [Ident(prefix + ast.name, ast.lineno, ast.col_offset + 6)]
     if isinstance(ast, (AsyncFor, For, Module, ExceptHandler)):
-        return flatten([_names(x) for x in ast.body])
+        return flatten([_names(x, prefix) for x in ast.body])
     if isinstance(ast, Try):
-        return flatten([_names(x) for x in ast.body]) + flatten([_names(x) for x in ast.handlers])
+        return flatten([_names(x, prefix) for x in ast.body]) + flatten([_names(x, prefix) for x in ast.handlers])
     # if isinstance(ast, withitem):
     #     pass
     if isinstance(ast, (With, AsyncWith)):
-        return flatten([_names(x) for x in ast.body])# + return flatten([_names(x) for x in ast.items])
+        return flatten([_names(x, prefix) for x in ast.body])# + return flatten([_names(x) for x in ast.items])
     # if isinstance(ast, alias):
     #     if alias_ := ast.asname:
     #         return [Ident(f"{ast.name} as {alias_}", ast.lineno, ast.col + len(ast.name))]
@@ -61,11 +63,11 @@ def _names(ast) -> List[Ident]:
 
 def symbols(path_: str) -> "Generator":
     with open(path_) as file:
-        all_symbols = [span.name for span in get_all_symbols(file.read())]
+        all_symbols = [span.name for span in get_all_symbols(file.read(), prefix=path_)]
     
     while True:
         with open(path_) as file:
-            symbols_ = get_all_symbols(file.read())
+            symbols_ = get_all_symbols(file.read(), prefix=path_)
         try:
             span = next(symbol for symbol in symbols_ if symbol.name in all_symbols)
             all_symbols.remove(span.name)
@@ -74,14 +76,14 @@ def symbols(path_: str) -> "Generator":
             return
             
 
-def get_all_symbols(text: str) -> List[Span]:
+def get_all_symbols(text: str, prefix: str = '') -> List[Span]:
     ast_ = parse(text)
 
     lines = [len(line) for line in text.splitlines(True)]
 
     skip = set()
     out = []
-    for ident in _names(ast_):
+    for ident in _names(ast_, prefix):
         if not ident.name in skip:
             skip.add(ident.name)
             offset = sum(lines[:ident.line - 1]) + ident.col
@@ -127,15 +129,17 @@ def next_name(names: List[str]) -> str:
 #     ast_ = [x for x in parse(content) is isinstance(x, Import)]
 #     re = Restructure(proj, "")
 
-PYDOC_PATTERN_SEMICOL = re.compile(r'(?<=:)\s+""".+"""')
+PYDOC_PATTERN_SEMICOL = re.compile(r'(?<=:)(\s+)""".+"""')
 PYDOC_PATTERN_MODULE = re.compile(r'^""".+"""')
+COMMENT_PATTERN = re.compile(r'#[ \w]*')
 
 def remove_pydoc(path_):
     """Let's be honest, nobody reads it anyway!"""
     with open(path_) as file:
         content = file.read()
-    content = re.sub(PYDOC_PATTERN_SEMICOL, '', content)
+    content = re.sub(PYDOC_PATTERN_SEMICOL, r'\1pass', content)
     content = re.sub(PYDOC_PATTERN_MODULE, '', content)
+    content = re.sub(COMMENT_PATTERN, '', content)
     with open(path_, 'w') as file:
         file.write(content)
 
