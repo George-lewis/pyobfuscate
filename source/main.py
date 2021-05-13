@@ -1,17 +1,15 @@
 from typing import List
 
-from ast import parse, Name, Assign, Module, FunctionDef, arguments, arg, ClassDef, Expr, For, Try, ExceptHandler
-
+import sys
+from ast import (Assign, AsyncFunctionDef, ClassDef, ExceptHandler, Expr, For, FunctionDef, Import, ImportFrom, Module,
+                 Name, Try, alias, arg, arguments, parse, With, AsyncWith, withitem, AsyncFor)
 from dataclasses import dataclass
-
 from os import path, walk
 
 from crayons import red
-
 from rope.base.project import Project
 from rope.refactor.rename import Rename
 
-import sys
 
 @dataclass
 class Ident:
@@ -37,12 +35,25 @@ def _names(ast) -> List[Ident]:
         return flatten([_names(x) for x in ast.targets])
     if isinstance(ast, FunctionDef):
         return flatten([_names(x) for x in ast.body]) + _names(ast.args) + [Ident(ast.name, ast.lineno, ast.col_offset + 4)]
+    if isinstance(ast, AsyncFunctionDef):
+        return flatten([_names(x) for x in ast.body]) + _names(ast.args) + [Ident(ast.name, ast.lineno, ast.col_offset + 10)]
     if isinstance(ast, ClassDef):
         return flatten([_names(x) for x in ast.body]) + [Ident(ast.name, ast.lineno, ast.col_offset + 6)]
-    if isinstance(ast, (For, Module, ExceptHandler)):
+    if isinstance(ast, (AsyncFor, For, Module, ExceptHandler)):
         return flatten([_names(x) for x in ast.body])
     if isinstance(ast, Try):
         return flatten([_names(x) for x in ast.body]) + flatten([_names(x) for x in ast.handlers])
+    # if isinstance(ast, withitem):
+    #     pass
+    if isinstance(ast, (With, AsyncWith)):
+        return flatten([_names(x) for x in ast.body])# + return flatten([_names(x) for x in ast.items])
+    # if isinstance(ast, alias):
+    #     if alias_ := ast.asname:
+    #         return [Ident(f"{ast.name} as {alias_}", ast.lineno, ast.col + len(ast.name))]
+    #     else:
+    #         return []
+    # if isinstance(ast, ImportFrom):
+    #     return flatten([_names(x) for x in ast.names])
     print("skip: ", ast)
     return []
 
@@ -93,6 +104,8 @@ def increment_name(name: str, pos: int) -> str:
     else:
         return replace(name, pos, alphabet[idx + 1])
 
+python_keywords = ["in", "as", "not"]
+
 def next_name(names: List[str]) -> str:
     if len(names) == 0:
         new = alphabet[0]
@@ -101,16 +114,34 @@ def next_name(names: List[str]) -> str:
     
     new = increment_name(names[-1], -1)
     names.append(new)
-    return new
+    if new in python_keywords:
+        return next_name(names)
+    else:
+        return new
+
+# def refactor_imports(proj, res, path_, names):
+#     with open(path_) as file:
+#         content = file.read()
+#     ast_ = [x for x in parse(content) is isinstance(x, Import)]
+#     re = Restructure(proj, "")
 
 def process_file(proj, res, path_, names):
     for span in symbols(path_):
         print(span)
         name = next_name(names)
         print(f"[{span.name} @ {span.pos}] -> {name}")
-        re = Rename(proj, res, span.pos)
+        try:
+            re = Rename(proj, res, span.pos)
+        except Exception as e:
+            print(f"PROBLEM RENAMING: {e}")
+            continue
         ch = re.get_changes(name)
         proj.do(ch)
+    re = Rename(proj, res)
+    new = next_name(names)
+    print(f"Renaming module [{path.split(path_)[1]}] to [{new}]")
+    ch = re.get_changes(new)
+    proj.do(ch)
     
 if __name__ == "__main__":
     if len(sys.argv) < 2:
