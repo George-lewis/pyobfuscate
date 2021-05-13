@@ -1,6 +1,6 @@
 from typing import List
 
-from ast import parse, Name, Assign, Module, FunctionDef, arguments, arg
+from ast import parse, Name, Assign, Module, FunctionDef, arguments, arg, ClassDef, Expr, For, Try
 
 from dataclasses import dataclass
 
@@ -35,10 +35,13 @@ def _names(ast) -> List[Ident]:
         return [Ident(ast.id, ast.lineno, ast.col_offset)]
     if isinstance(ast, Assign):
         return flatten([_names(x) for x in ast.targets])
-    if isinstance(ast, Module):
-        return flatten([_names(x) for x in ast.body])
     if isinstance(ast, FunctionDef):
         return flatten([_names(x) for x in ast.body]) + _names(ast.args) + [Ident(ast.name, ast.lineno, ast.col_offset + 4)]
+    if isinstance(ast, ClassDef):
+        return flatten([_names(x) for x in ast.body]) + [Ident(ast.name, ast.lineno, ast.col_offset + 6)]
+    if isinstance(ast, (For, Try, Module)):
+        return flatten([_names(x) for x in ast.body])
+    print("skip: ", ast)
     return []
 
 def symbols(path_: str) -> "Generator":
