@@ -6,6 +6,8 @@ from ast import (Assign, AsyncFunctionDef, ClassDef, ExceptHandler, Expr, For, F
 from dataclasses import dataclass
 from os import path, walk
 
+import re
+
 from crayons import red
 from rope.base.project import Project
 from rope.refactor.rename import Rename
@@ -125,6 +127,18 @@ def next_name(names: List[str]) -> str:
 #     ast_ = [x for x in parse(content) is isinstance(x, Import)]
 #     re = Restructure(proj, "")
 
+PYDOC_PATTERN_SEMICOL = re.compile(r'(?<=:)\s+""".+"""')
+PYDOC_PATTERN_MODULE = re.compile(r'^""".+"""')
+
+def remove_pydoc(path_):
+    """Let's be honest, nobody reads it anyway!"""
+    with open(path_) as file:
+        content = file.read()
+    content = re.sub(PYDOC_PATTERN_SEMICOL, '', content)
+    content = re.sub(PYDOC_PATTERN_MODULE, '', content)
+    with open(path_, 'w') as file:
+        file.write(content)
+
 def process_file(proj, res, path_, names):
     for span in symbols(path_):
         print(span)
@@ -137,6 +151,9 @@ def process_file(proj, res, path_, names):
             continue
         ch = re.get_changes(name)
         proj.do(ch)
+
+    remove_pydoc(path_)
+    
     re = Rename(proj, res)
     new = next_name(names)
     print(f"Renaming module [{path.split(path_)[1]}] to [{new}]")
