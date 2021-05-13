@@ -42,6 +42,7 @@ def _names(ast, prefix: str = '') -> List[Ident]:
         prefix = prefix + ast.name
         return flatten([_names(x, prefix) for x in ast.body]) + _names(ast.args, prefix) + [Ident(prefix + ast.name, ast.lineno, ast.col_offset + 10)]
     if isinstance(ast, ClassDef):
+        prefix = prefix + ast.name
         return flatten([_names(x, prefix) for x in ast.body]) + [Ident(prefix + ast.name, ast.lineno, ast.col_offset + 6)]
     if isinstance(ast, (AsyncFor, For, Module, ExceptHandler)):
         return flatten([_names(x, prefix) for x in ast.body])
@@ -108,7 +109,7 @@ def increment_name(name: str, pos: int) -> str:
     else:
         return replace(name, pos, alphabet[idx + 1])
 
-python_keywords = ["in", "as", "not"]
+python_keywords = ["in", "as", "not", "if", "with"]
 
 def next_name(names: List[str]) -> str:
     if len(names) == 0:
